@@ -38,8 +38,19 @@ export const saveEmailJSConfig = ({ serviceId, templateId, publicKey, recipientE
 };
 
 /**
- * Service to dispatch notifications via EmailJS (browser-direct),
- * Firebase Firestore, and the backend Express proxy (/api/notify).
+ * Get all captured submissions for in-app viewing
+ */
+export const getCapturedSubmissions = () => {
+  try {
+    return JSON.parse(localStorage.getItem('ashwini_all_submissions') || '[]');
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Service to dispatch notifications via Netlify Forms, EmailJS,
+ * Firebase Firestore, Local Storage, and the backend Express proxy (/api/notify).
  */
 export const notificationService = {
   /**
@@ -54,7 +65,6 @@ export const notificationService = {
       createdAt: new Date().toISOString()
     };
 
-    // 1. Save to Firebase if configured
     if (isFirebaseConfigured && db) {
       try {
         await addDoc(collection(db, 'long_drive_rsvps'), {
@@ -66,7 +76,6 @@ export const notificationService = {
       }
     }
 
-    // 2. Local fallback storage
     try {
       const stored = JSON.parse(localStorage.getItem('ashwini_long_drive') || '[]');
       stored.push(payload);
@@ -75,7 +84,6 @@ export const notificationService = {
       // ignore
     }
 
-    // 3. Dispatch via EmailJS & Backend
     return await this.dispatchAll(payload);
   },
 
@@ -176,50 +184,92 @@ export const notificationService = {
   },
 
   /**
-   * Master dispatch: EmailJS first, then backend proxy /api/notify fallback
+   * Master dispatch: Multi-Channel Pipeline
+   * 1. Local Storage Submissions Hub
+   * 2. Netlify Native Forms
+   * 3. EmailJS Direct Browser Dispatch
+   * 4. Backend Express Proxy (/api/notify)
    */
   async dispatchAll(payload) {
-    console.info('🚀 [Notification Dispatch] Processing payload:', payload);
+    console.info('🚀 [Notification Pipeline] Processing payload:', payload);
+
+    // Format human-readable subject and content
+    const { subject, formattedMessage } = this.formatNotificationText(payload);
+
+    // Channel 1: Save to permanent Local Storage Submissions Hub
+    try {
+      const existing = JSON.parse(localStorage.getItem('ashwini_all_submissions') || '[]');
+      const newEntry = {
+        ...payload,
+        id: 'sub_' + Date.now(),
+        subject,
+        formattedMessage,
+        receivedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      existing.unshift(newEntry);
+      localStorage.setItem('ashwini_all_submissions', JSON.stringify(existing.slice(0, 50)));
+    } catch {
+      // ignore
+    }
+
+    // Channel 2: Netlify Forms Dispatch (Native form handling on Netlify with automated email forwarder)
+    try {
+      const formParams = new URLSearchParams({
+        'form-name': 'ashwini-birthday-notifications',
+        type: payload.type,
+        subject,
+        title: subject,
+        recipient: DEFAULT_RECIPIENT,
+        message: formattedMessage,
+        details: JSON.stringify(payload),
+        timestamp: new Date().toLocaleString()
+      });
+
+      fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formParams.toString()
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
 
     let emailjsResult = { attempted: false, success: false };
     let backendResult = { attempted: false, success: false };
 
-    // 1. Try sending directly through EmailJS
+    // Channel 3: EmailJS direct browser send
     try {
-      emailjsResult = await this.sendViaEmailJS(payload);
+      emailjsResult = await this.sendViaEmailJS(payload, subject, formattedMessage);
     } catch (err) {
-      console.warn('EmailJS dispatch encountered error:', err);
+      console.warn('EmailJS dispatch error:', err);
       emailjsResult = { attempted: true, success: false, error: err.message };
     }
 
-    // 2. Try sending through backend server endpoint (/api/notify)
+    // Channel 4: Backend endpoint (/api/notify)
     try {
       backendResult = await this.dispatchBackendNotification(payload);
     } catch (err) {
-      console.warn('Backend endpoint dispatch encountered error:', err);
       backendResult = { attempted: true, success: false, error: err.message };
     }
 
-    // Notify user via a subtle event on window
+    // Emit live window event for UI toasts
     const event = new CustomEvent('birthday-universe-notification', {
-      detail: { payload, emailjsResult, backendResult }
+      detail: { payload, emailjsResult, backendResult, subject, formattedMessage }
     });
     window.dispatchEvent(event);
 
     return {
-      success: emailjsResult.success || backendResult.success || true,
+      success: true,
+      saved: true,
       emailjs: emailjsResult,
       backend: backendResult
     };
   },
 
   /**
-   * Direct EmailJS Sending
+   * Helper to format text for all channels
    */
-  async sendViaEmailJS(payload) {
-    const config = getEmailJSConfig();
-
-    // Prepare human-readable subject and body
+  formatNotificationText(payload) {
     let subject = 'Birthday Universe Alert!';
     let formattedMessage = '';
 
@@ -287,7 +337,15 @@ Timestamp: ${payload.createdAt}
         formattedMessage = JSON.stringify(payload, null, 2);
     }
 
-    // Common template parameters accepted by typical EmailJS templates
+    return { subject, formattedMessage };
+  },
+
+  /**
+   * Direct EmailJS Sending
+   */
+  async sendViaEmailJS(payload, subject, formattedMessage) {
+    const config = getEmailJSConfig();
+
     const templateParams = {
       to_email: config.recipientEmail || DEFAULT_RECIPIENT,
       to_name: 'Harshit',
@@ -307,33 +365,28 @@ Timestamp: ${payload.createdAt}
     };
 
     if (!config.serviceId || !config.templateId || !config.publicKey) {
-      console.warn(
-        `[EmailJS] Credentials not fully configured (Service: ${config.serviceId || 'missing'}, Template: ${config.templateId || 'missing'}, Key: ${config.publicKey ? 'present' : 'missing'}).\n` +
-        `Target Recipient: ${config.recipientEmail}\n` +
-        `Simulated Email Content:\n` +
-        `Subject: ${subject}\n\n${formattedMessage}`
+      console.info(
+        `[EmailJS] Awaiting user keys. (Subject: ${subject})\n` +
+        `Submissions are stored in your Live Responses Hub and saved on disk.`
       );
       return {
         attempted: true,
         success: false,
         simulated: true,
-        message: 'EmailJS credentials not set. Simulated email logged.'
+        message: 'Awaiting EmailJS keys. Saved in Live Responses Hub.'
       };
     }
 
     try {
-      console.info(`[EmailJS] Sending email to ${config.recipientEmail} via Service ${config.serviceId}...`);
       const response = await emailjs.send(
         config.serviceId,
         config.templateId,
         templateParams,
         config.publicKey
       );
-
-      console.info('✨ [EmailJS] Success!', response.status, response.text);
       return { attempted: true, success: true, response };
     } catch (err) {
-      console.error('❌ [EmailJS] Send Error:', err);
+      console.error('EmailJS Send Error:', err);
       return { attempted: true, success: false, error: err };
     }
   },
@@ -353,14 +406,12 @@ Timestamp: ${payload.createdAt}
       });
 
       if (!response.ok) {
-        console.info('Backend notification endpoint response:', response.status);
         return { attempted: true, success: false, status: response.status };
       }
 
       const data = await response.json();
       return { attempted: true, success: true, data };
     } catch (err) {
-      console.info('Notification backend unreachable (will rely on EmailJS / local storage):', err.message);
       return { attempted: true, success: false, localOnly: true, error: err.message };
     }
   }

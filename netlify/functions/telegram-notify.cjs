@@ -1,9 +1,7 @@
 /**
- * Netlify Serverless Function: telegram-notify
- * Sends notifications to Telegram Bot API
+ * Netlify Serverless Function: telegram-notify (.cjs for 100% compatibility with "type": "module" repos)
+ * Zero external dependencies — uses built-in Node fetch.
  */
-
-// --- Inline Telegram Service (Netlify functions are standalone) ---
 
 function sanitizeText(text, maxLength = 1000) {
   if (typeof text !== 'string') return '';
@@ -12,14 +10,17 @@ function sanitizeText(text, maxLength = 1000) {
 }
 
 function formatTimestamp(date = new Date()) {
-  return new Intl.DateTimeFormat('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Kolkata'
-  }).format(date);
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Kolkata'
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
 }
 
-// In-memory dedup + rate limit (resets on cold start, which is fine)
 const recentEventIds = new Set();
 const ipRateLimits = new Map();
 
@@ -31,7 +32,7 @@ function isRateLimited(ip) {
     return false;
   }
   record.count++;
-  return record.count > 15;
+  return record.count > 25;
 }
 
 function isDuplicate(eventId) {
@@ -110,7 +111,7 @@ function formatTelegramMessage(payload) {
       return [
         '🐼 ASHWINI BIRTHDAY WEBSITE', '',
         '🚗 LONG DRIVE RESPONSE',
-        'Decision: YES! Let\'s plan it! ❤️',
+        "Decision: YES! Let's plan it! ❤️",
         `Preferred date: ${sanitizeText(payload.date || 'TBD')}`,
         `Preferred time: ${sanitizeText(payload.time || 'Evening')}`,
         payload.playlistOrNote ? `Note: "${sanitizeText(payload.playlistOrNote)}"` : '',
@@ -153,28 +154,38 @@ function formatTelegramMessage(payload) {
   }
 }
 
-// --- Netlify Function Handler ---
-
-export const handler = async (event) => {
-  // CORS headers for browser requests
+exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' };
+  }
+
+  // Safe diagnostic GET endpoint (never exposes token)
+  if (event.httpMethod === 'GET') {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        status: 'online',
+        function: 'telegram-notify.cjs',
+        hasToken: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'YOUR_NEW_BOT_TOKEN'),
+        hasChatId: Boolean(process.env.TELEGRAM_CHAT_ID),
+        nodeVersion: process.version
+      })
+    };
   }
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ success: false, error: 'Method Not Allowed' }) };
   }
 
-  // Rate limit
-  const clientIp = event.headers['x-forwarded-for'] || event.headers['client-ip'] || 'unknown';
+  const clientIp = (event.headers && (event.headers['x-forwarded-for'] || event.headers['client-ip'])) || 'unknown';
   if (isRateLimited(clientIp)) {
     return { statusCode: 429, headers, body: JSON.stringify({ success: false, error: 'Too many requests.' }) };
   }
@@ -190,19 +201,19 @@ export const handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Missing type' }) };
   }
 
-  // Dedup
   if (payload.eventId && isDuplicate(payload.eventId)) {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, duplicate: true }) };
   }
 
-  // Send to Telegram
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
 
   if (!botToken || botToken === 'YOUR_NEW_BOT_TOKEN') {
+    console.error('[Telegram] Missing TELEGRAM_BOT_TOKEN env var');
     return {
-      statusCode: 200, headers,
-      body: JSON.stringify({ success: false, message: 'Bot token not configured' })
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: false, error: 'TELEGRAM_BOT_TOKEN not configured in Netlify environment variables' })
     };
   }
 
@@ -218,13 +229,14 @@ export const handler = async (event) => {
     const result = await response.json();
 
     if (!response.ok || !result.ok) {
-      console.error(`[Telegram Error] ${response.status}: ${result.description}`);
+      console.error(`[Telegram API Error] ${response.status}: ${result.description}`);
       return { statusCode: 502, headers, body: JSON.stringify({ success: false, error: 'Telegram delivery failed' }) };
     }
 
     return {
-      statusCode: 200, headers,
-      body: JSON.stringify({ success: true, messageId: result.result?.message_id })
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: true, messageId: result.result && result.result.message_id })
     };
   } catch (err) {
     console.error('[Telegram Network Error]', err.message);

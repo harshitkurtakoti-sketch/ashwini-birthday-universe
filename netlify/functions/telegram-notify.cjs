@@ -168,13 +168,23 @@ exports.handler = async (event) => {
 
   // Safe diagnostic GET endpoint (never exposes token)
   if (event.httpMethod === 'GET') {
-    const rawToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const rawToken =
+      process.env.TELEGRAM_BOT_TOKEN ||
+      process.env.VITE_TELEGRAM_BOT_TOKEN ||
+      process.env.BOT_TOKEN ||
+      '';
     const botToken = rawToken.trim().replace(/^["']|["']$/g, '');
-    const rawChatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
+    const rawChatId =
+      process.env.TELEGRAM_CHAT_ID ||
+      process.env.VITE_TELEGRAM_CHAT_ID ||
+      '7904103952';
     const chatId = rawChatId.trim().replace(/^["']|["']$/g, '');
 
     const hasToken = Boolean(botToken && botToken !== 'YOUR_NEW_BOT_TOKEN');
     const hasChatId = Boolean(chatId);
+    const matchingEnvKeys = Object.keys(process.env).filter(
+      (k) => k.toUpperCase().includes('TELEGRAM') || k.toUpperCase().includes('BOT')
+    );
 
     // If ?test=1 is passed, send an actual test message to Telegram
     if (event.queryStringParameters && event.queryStringParameters.test === '1') {
@@ -224,6 +234,7 @@ exports.handler = async (event) => {
         function: 'telegram-notify.cjs',
         hasToken,
         hasChatId,
+        matchingEnvKeys,
         tokenFormatValid: /^\d+:[A-Za-z0-9_-]+$/.test(botToken),
         nodeVersion: process.version
       })
@@ -254,9 +265,16 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, duplicate: true }) };
   }
 
-  const rawToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  const rawToken =
+    process.env.TELEGRAM_BOT_TOKEN ||
+    process.env.VITE_TELEGRAM_BOT_TOKEN ||
+    process.env.BOT_TOKEN ||
+    '';
   const botToken = rawToken.trim().replace(/^["']|["']$/g, '');
-  const rawChatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
+  const rawChatId =
+    process.env.TELEGRAM_CHAT_ID ||
+    process.env.VITE_TELEGRAM_CHAT_ID ||
+    '7904103952';
   const chatId = rawChatId.trim().replace(/^["']|["']$/g, '');
 
   if (!botToken || botToken === 'YOUR_NEW_BOT_TOKEN') {

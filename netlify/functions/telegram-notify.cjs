@@ -168,14 +168,63 @@ exports.handler = async (event) => {
 
   // Safe diagnostic GET endpoint (never exposes token)
   if (event.httpMethod === 'GET') {
+    const rawToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const botToken = rawToken.trim().replace(/^["']|["']$/g, '');
+    const rawChatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
+    const chatId = rawChatId.trim().replace(/^["']|["']$/g, '');
+
+    const hasToken = Boolean(botToken && botToken !== 'YOUR_NEW_BOT_TOKEN');
+    const hasChatId = Boolean(chatId);
+
+    // If ?test=1 is passed, send an actual test message to Telegram
+    if (event.queryStringParameters && event.queryStringParameters.test === '1') {
+      if (!hasToken) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ status: 'error', hasToken: false, message: 'TELEGRAM_BOT_TOKEN not set' })
+        };
+      }
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: formatTelegramMessage({ type: 'TEST_PING' })
+          })
+        });
+        const tgJson = await tgRes.json();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            status: tgJson.ok ? 'sent' : 'telegram_rejected',
+            hasToken,
+            hasChatId,
+            telegramOk: tgJson.ok,
+            telegramError: tgJson.description || null,
+            messageId: tgJson.result?.message_id || null
+          })
+        };
+      } catch (err) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ status: 'network_error', error: err.message })
+        };
+      }
+    }
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         status: 'online',
         function: 'telegram-notify.cjs',
-        hasToken: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'YOUR_NEW_BOT_TOKEN'),
-        hasChatId: Boolean(process.env.TELEGRAM_CHAT_ID),
+        hasToken,
+        hasChatId,
+        tokenFormatValid: /^\d+:[A-Za-z0-9_-]+$/.test(botToken),
         nodeVersion: process.version
       })
     };
@@ -205,8 +254,10 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, duplicate: true }) };
   }
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
+  const rawToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  const botToken = rawToken.trim().replace(/^["']|["']$/g, '');
+  const rawChatId = process.env.TELEGRAM_CHAT_ID || '7904103952';
+  const chatId = rawChatId.trim().replace(/^["']|["']$/g, '');
 
   if (!botToken || botToken === 'YOUR_NEW_BOT_TOKEN') {
     console.error('[Telegram] Missing TELEGRAM_BOT_TOKEN env var');

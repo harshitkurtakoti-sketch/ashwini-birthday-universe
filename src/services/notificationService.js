@@ -39,6 +39,7 @@ class NotificationService {
         headers: {
           'Content-Type': 'application/json'
         },
+        keepalive: true,
         body: JSON.stringify(enrichedPayload)
       });
 
@@ -49,6 +50,7 @@ class NotificationService {
           headers: {
             'Content-Type': 'application/json'
           },
+          keepalive: true,
           body: JSON.stringify(enrichedPayload)
         });
       }

@@ -6,6 +6,7 @@ import PhotoSlideshow from '../components/PhotoSlideshow';
 import SectionNextButton from '../components/SectionNextButton';
 import { photosConfig } from '../config/photos.config';
 import audioService from '../services/audioService';
+import notificationService from '../services/notificationService';
 import progressService from '../services/progressService';
 
 export default function Section04Letter({ progress, onUpdateProgress, onNext }) {
@@ -16,6 +17,10 @@ export default function Section04Letter({ progress, onUpdateProgress, onNext }) 
     audioService.playRustle();
     setIsOpen(true);
     onUpdateProgress({ letterOpened: true });
+    notificationService.notifyChapterProgress({
+      chapter: 'CHAPTER 04 • PERSONAL LETTER',
+      action: 'Broke the wax seal and opened your letter! 💌'
+    }).catch(() => {});
     confetti({
       particleCount: 70,
       spread: 70,

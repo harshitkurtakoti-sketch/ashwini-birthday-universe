@@ -11,11 +11,13 @@
   from = "/api/telegram-notify"
   to = "/.netlify/functions/telegram-notify"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/notify"
   to = "/.netlify/functions/telegram-notify"
   status = 200
+  force = true
 
 # SPA fallback — must be LAST
 [[redirects]]

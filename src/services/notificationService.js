@@ -26,15 +26,32 @@ class NotificationService {
     };
 
     try {
-      // Primary endpoint is /api/telegram-notify; fallback is /api/notify
-      const endpoint = '/api/telegram-notify';
-      const response = await fetch(endpoint, {
+      const isLocal =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      const primaryEndpoint = isLocal
+        ? '/api/telegram-notify'
+        : '/.netlify/functions/telegram-notify';
+
+      let response = await fetch(primaryEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(enrichedPayload)
       });
+
+      // Fallback to /api/telegram-notify if hosted on Vercel (where /.netlify/functions returns 404)
+      if (!isLocal && response.status === 404) {
+        response = await fetch('/api/telegram-notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(enrichedPayload)
+        });
+      }
 
       if (!response.ok) {
         // Safe console log without leaking sensitive details
@@ -43,7 +60,7 @@ class NotificationService {
       }
 
       const data = await response.json();
-      return { success: true, data };
+      return { success: Boolean(data?.success), data };
     } catch (err) {
       // Gracefully handle network disconnect without disrupting Ashwini's experience
       console.warn('[Notification] Dispatch network error:', err.message);
@@ -146,6 +163,18 @@ class NotificationService {
 
     return await this.dispatch({
       type: 'FINAL_COMPLETION'
+    });
+  }
+
+  /**
+   * 9. Chapter / Journey Progress (Video finished, Letter opened, Chapter entered)
+   */
+  async notifyChapterProgress({ chapter, action, detail }) {
+    return await this.dispatch({
+      type: 'CHAPTER_PROGRESS',
+      chapter,
+      action,
+      detail
     });
   }
 

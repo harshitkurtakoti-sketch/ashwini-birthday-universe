@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import PhotoSlideshow from '../components/PhotoSlideshow';
 import { photosConfig } from '../config/photos.config';
 import audioService from '../services/audioService';
+import notificationService from '../services/notificationService';
 
 export default function Section01Welcome({ onEnter }) {
   const [typedName, setTypedName] = useState('');
@@ -32,6 +33,10 @@ export default function Section01Welcome({ onEnter }) {
       origin: { y: 0.6 },
       colors: ['#f472b6', '#c084fc', '#e879f9', '#fbcfe8']
     });
+    notificationService.notifyChapterProgress({
+      chapter: 'CHAPTER 01 • WELCOME',
+      action: 'Clicked "Enter Your Surprise" and unlocked Chapter 02! 🌸'
+    }).catch(() => {});
     onEnter();
   };
 

@@ -126,6 +126,15 @@ function formatTelegramMessage(payload) {
         `Time: ${time}`
       ].join('\n');
 
+    case 'CHAPTER_PROGRESS':
+      return [
+        '🐼 ASHWINI BIRTHDAY WEBSITE', '',
+        `📍 ${sanitizeText(payload.chapter || 'CHAPTER UPDATE')}`,
+        `Action: ${sanitizeText(payload.action)}`,
+        payload.detail ? `Detail: ${sanitizeText(payload.detail)}` : '',
+        `Time: ${time}`
+      ].filter(Boolean).join('\n');
+
     case 'TEST_PING':
       return [
         '🐼 ASHWINI BIRTHDAY WEBSITE', '',

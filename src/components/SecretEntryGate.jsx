@@ -79,6 +79,10 @@ export default function SecretEntryGate({ onComplete }) {
   const handleVideoEnded = () => {
     audioService.playSparkle();
     setStage('ready');
+    notificationService.notifyChapterProgress({
+      chapter: 'VIDEO INTRO',
+      action: 'Finished watching your special video intro! 🎬💗'
+    }).catch(() => {});
   };
 
   return (

@@ -7,6 +7,7 @@ import PhotoSlideshow from '../components/PhotoSlideshow';
 import SectionNextButton from '../components/SectionNextButton';
 import { photosConfig } from '../config/photos.config';
 import audioService from '../services/audioService';
+import notificationService from '../services/notificationService';
 import progressService from '../services/progressService';
 
 const ICON_MAP = {
@@ -42,6 +43,14 @@ export default function Section03Awards({ progress, onUpdateProgress, onNext }) 
     const updated = new Set(viewedAwardIds);
     updated.add(awardId);
     onUpdateProgress({ awardsViewed: Array.from(updated) });
+
+    const claimed = awardsList.find(a => a.id === awardId);
+    if (claimed) {
+      notificationService.notifyChapterProgress({
+        chapter: 'CHAPTER 03 • AWARDS',
+        action: `Claimed award: "${claimed.title}" 🏆`
+      }).catch(() => {});
+    }
 
     confetti({
       particleCount: 90,

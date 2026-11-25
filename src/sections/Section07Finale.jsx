@@ -248,6 +248,9 @@ export default function Section07Finale({ progress, onUpdateProgress }) {
                     onClick={() => {
                       audioService.playSuccessChime();
                       setDecisionState('form');
+                      notificationService.notifyLongDriveDecision({
+                        decision: "Reconsidered in FOMO: Okay fine, let's plan it! ❤️"
+                      }).catch(() => {});
                     }}
                     className="flex-1 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 hover:brightness-110 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-xl shadow-pink-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Lock, Unlock, Sparkles, VolumeX, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import audioService from '../services/audioService';
+import notificationService from '../services/notificationService';
 
 export default function SecretEntryGate({ onComplete }) {
   const [stage, setStage] = useState('question'); // 'question' | 'unlocking' | 'video' | 'ready'
@@ -23,6 +24,9 @@ export default function SecretEntryGate({ onComplete }) {
       audioService.playSuccessChime();
       setErrorMsg('');
       setStage('unlocking');
+
+      // Notify Harshit via Telegram (only on correct answer)
+      notificationService.notifySecretUnlocked(inputAnswer.trim()).catch(() => {});
 
       confetti({
         particleCount: 100,

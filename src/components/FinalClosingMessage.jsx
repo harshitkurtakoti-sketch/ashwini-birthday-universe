@@ -1,7 +1,17 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import notificationService from '../services/notificationService';
 
 export default function FinalClosingMessage() {
+  const hasNotified = useRef(false);
+
+  useEffect(() => {
+    if (!hasNotified.current) {
+      hasNotified.current = true;
+      notificationService.notifyFinalCompletion().catch(() => {});
+    }
+  }, []);
+
   return (
     <div className="w-full flex flex-col items-center justify-center py-20 px-4 relative z-10">
       

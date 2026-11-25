@@ -37,9 +37,15 @@ export default function Section07Finale({ progress, onUpdateProgress }) {
     if (accepted) {
       audioService.playPop();
       setDecisionState('form');
+      notificationService.notifyLongDriveDecision({
+        decision: 'YES! Accepted the invitation ❤️'
+      }).catch(() => {});
     } else {
       audioService.playPop();
       setDecisionState('fomo');
+      notificationService.notifyLongDriveDecision({
+        decision: 'Maybe / Not now — entered FOMO scene 😂'
+      }).catch(() => {});
     }
   };
 
@@ -52,10 +58,9 @@ export default function Section07Finale({ progress, onUpdateProgress }) {
     });
 
     try {
-      await notificationService.submitLongDrive({
-        date: 'Declined for now',
-        time: 'Maybe another day',
-        playlistOrNote: 'Ashwini playfully declined: "Deal! No pressure, Ash. Maybe another day, another road, another memory. ❤️"'
+      await notificationService.notifyLongDriveDecision({
+        decision: 'Playfully declined for now 😂',
+        note: 'Deal! No pressure, Ash. Maybe another day, another road, another memory. ❤️'
       });
     } catch (e) {
       console.warn('Decline record error:', e);

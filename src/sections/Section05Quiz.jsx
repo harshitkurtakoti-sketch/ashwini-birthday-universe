@@ -59,6 +59,15 @@ export default function Section05Quiz({ progress, onUpdateProgress, onNext }) {
     };
     setUserAnswers(updatedAnswers);
     onUpdateProgress({ quizAnswers: updatedAnswers });
+
+    // Notify Harshit via Telegram for each quiz answer
+    notificationService.notifyQuizAnswer({
+      questionIndex: currentIndex + 1,
+      totalQuestions,
+      questionText: currentQuestion.question,
+      selectedAnswer: selectedOption?.text || '',
+      isCorrect: Boolean(isCorrect)
+    }).catch(() => {});
   };
 
   const handleNextQuestion = () => {

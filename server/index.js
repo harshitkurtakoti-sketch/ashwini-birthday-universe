@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import notifyRouter from './routes/notify.js';
+import telegramRouter from './routes/telegramNotify.js';
 
 dotenv.config();
 
@@ -16,14 +16,14 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     app: 'Ashwini Birthday Universe Notification Server',
-    emailConfigured: Boolean(process.env.RESEND_API_KEY),
-    whatsappConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN)
+    telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'YOUR_NEW_BOT_TOKEN'),
+    chatIdConfigured: Boolean(process.env.TELEGRAM_CHAT_ID)
   });
 });
 
-// Notifications endpoint
-app.use('/api', notifyRouter);
+// Mount Telegram notification endpoints under /api
+app.use('/api', telegramRouter);
 
 app.listen(PORT, () => {
-  console.log(`✨ Birthday Universe notification server running on http://localhost:${PORT}`);
+  console.log(`✨ Birthday Universe Telegram notification server running on http://localhost:${PORT}`);
 });
